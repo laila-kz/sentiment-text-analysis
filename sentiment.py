@@ -476,13 +476,15 @@ class ModelHandle:
         if not texts:
             return []
         if self.tokenizer is not None and self.network is not None:
-            return self._predict_logits_torch(texts)
+            return self._predict_logits_torch(texts, self.tokenizer, self.network)
         return self._predict_logits_pipeline(texts)
 
-    def _predict_logits_torch(self, texts: Sequence[str]) -> list[list[float]]:
+    def _predict_logits_torch(
+        self, texts: Sequence[str], tokenizer: Any, network: Any
+    ) -> list[list[float]]:
         import torch
 
-        encoded = self.tokenizer(
+        encoded = tokenizer(
             list(texts),
             return_tensors="pt",
             padding=True,
@@ -491,7 +493,7 @@ class ModelHandle:
         )
         encoded = {key: value.to(self.device) for key, value in encoded.items()}
         with torch.inference_mode():
-            output = self.network(**encoded)
+            output = network(**encoded)
         logits = output.logits
         return logits.detach().to("cpu", dtype=torch.float32).tolist()
 

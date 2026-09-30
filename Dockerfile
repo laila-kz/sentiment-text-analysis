@@ -69,9 +69,7 @@ USER app
 VOLUME ["/models"]
 EXPOSE 8000 8501
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries 3 \
-    CMD python -c "import urllib.request,os,sys; \
-url='http://127.0.0.1:'+os.environ.get('SENTIMENT_API_PORT','8000')+'/health'; \
-sys.exit(0 if urllib.request.urlopen(url, timeout=4).status==200 else 1)"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"
 
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

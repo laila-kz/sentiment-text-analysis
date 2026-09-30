@@ -435,13 +435,9 @@ def run() -> None:  # pragma: no cover - manual invocation
     """Run the service with uvicorn (``python api.py``)."""
     import uvicorn
 
-    settings = get_settings()
-    uvicorn.run(
-        "api:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        log_config=None,
-    )
+    host = os.environ.get("SENTIMENT_API_HOST", "127.0.0.1")
+    port = int(os.environ.get("SENTIMENT_API_PORT", "8000"))
+    uvicorn.run("api:app", host=host, port=port, log_config=None)
 
 
 app = create_app()

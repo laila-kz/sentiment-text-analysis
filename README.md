@@ -53,7 +53,7 @@ A production-ready sentiment and emotion analysis platform: lazy-loaded Hugging 
 
 ## 3. Quick start (local)
 
-Prerequisites: Python 3.10+. Heavy ML deps (torch/transformers) are large; CPU-only is sufficient for the tests and for running with smaller models.
+Prerequisites: Python 3.11+ (the code uses `enum.StrEnum`). Heavy ML deps (torch/transformers) are large; CPU-only is sufficient for the tests and for running with smaller models.
 
 ```bash
 # Create and activate a virtual environment
