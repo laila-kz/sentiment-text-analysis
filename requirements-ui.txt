@@ -1,0 +1,12 @@
+# ---------------------------------------------------------------------------
+# Optional extras: the Streamlit dashboard and Whisper speech-to-text.
+#
+#   pip install -r requirements.txt -r requirements-ui.txt
+#
+# torch and transformers are intentionally NOT repeated here; install the core
+# requirements first. faster-whisper brings its own ctranslate2 backend, so it
+# is kept out of the default image build.
+# ---------------------------------------------------------------------------
+streamlit>=1.37
+pandas>=2.0,<3
+plotly>=5.20

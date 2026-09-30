@@ -1,0 +1,82 @@
+# Multi-service stack: FastAPI + Streamlit sharing one Hugging Face cache volume.
+#
+#   docker compose up --build
+#   API:       http://localhost:8000  (docs at /docs)
+#   Dashboard: http://localhost:8501
+#
+# First start downloads the checkpoints into the `hf-cache` volume, which can
+# take several minutes. Subsequent starts reuse it.
+
+services:
+  api:
+    build:
+      context: .
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    image: sentiment-platform:latest
+    container_name: sentiment-api
+    restart: unless-stopped
+    ports:
+      - "${SENTIMENT_API_PORT:-8000}:8000"
+    environment:
+      SENTIMENT_DEVICE: ${SENTIMENT_DEVICE:-auto}
+      SENTIMENT_BATCH_SIZE: ${SENTIMENT_BATCH_SIZE:-16}
+      SENTIMENT_MAX_LENGTH: ${SENTIMENT_MAX_LENGTH:-256}
+      SENTIMENT_TEMPERATURE: ${SENTIMENT_TEMPERATURE:-1.0}
+      SENTIMENT_UNCERTAINTY_THRESHOLD: ${SENTIMENT_UNCERTAINTY_THRESHOLD:-0.35}
+      SENTIMENT_RATE_LIMIT_REQUESTS: ${SENTIMENT_RATE_LIMIT_REQUESTS:-120}
+      SENTIMENT_RATE_LIMIT_WINDOW: ${SENTIMENT_RATE_LIMIT_WINDOW:-60}
+      SENTIMENT_CORS_ORIGINS: ${SENTIMENT_CORS_ORIGINS:-http://localhost:8501}
+      SENTIMENT_LOG_JSON: ${SENTIMENT_LOG_JSON:-true}
+      SENTIMENT_PRELOAD_MODELS: ${SENTIMENT_PRELOAD_MODELS:-false}
+      HF_HOME: /models
+    volumes:
+      - hf-cache:/models
+    # NVIDIA GPU passthrough; ignored on CPU-only hosts.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${SENTIMENT_GPU_COUNT:-1}
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  dashboard:
+    build:
+      context: .
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    image: sentiment-platform:latest
+    container_name: sentiment-dashboard
+    restart: unless-stopped
+    ports:
+      - "${SENTIMENT_DASHBOARD_PORT:-8501}:8501"
+    environment:
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      HF_HOME: /models
+    volumes:
+      - hf-cache:/models
+    depends_on:
+      api:
+        condition: service_healthy
+    command:
+      - streamlit
+      - run
+      - app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+
+volumes:
+  hf-cache:

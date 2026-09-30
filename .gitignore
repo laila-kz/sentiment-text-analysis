@@ -1,3 +1,32 @@
 .venv/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Tooling caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Model weights and local artefacts
+models/
+*.wav
+*.mp3
+*.m4a
+
+# Local environment and editors
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store

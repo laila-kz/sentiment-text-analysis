@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Model artefacts and local data
+models/
+*.csv
+*.tsv
+*.wav
+*.mp3
+*.m4a
+!tests/data/*
+!examples/*.csv
+
+# Local environment
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store
