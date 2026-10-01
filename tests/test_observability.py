@@ -238,7 +238,13 @@ class TestMiddlewareStack:
                     ]
                 )
 
-        scope = {"type": "http", "method": "GET", "path": "/", "headers": [], "client": None}
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [],
+            "client": None,
+        }
         import asyncio
 
         asyncio.run(RequestContextMiddleware(app)(scope, None, send))

@@ -13,7 +13,7 @@
 #   docker run -p 8501:8501 sentiment-platform streamlit run app.py
 #   docker run -it sentiment-platform python cli.py --text "great product"
 # ---------------------------------------------------------------------------
-ARG PYTHON_VERSION=3.11-slim
+ARG PYTHON_VERSION=3.11
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 
 # ---------------------------------------------------------------------------

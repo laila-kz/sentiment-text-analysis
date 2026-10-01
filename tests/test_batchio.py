@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -139,7 +140,7 @@ class TestAnnotation:
 
 class TestSerialisation:
     def test_csv_roundtrip(self) -> None:
-        records = [{"a": 1, "b": "x"}, {"c": [1, 2]}]
+        records: list[dict[str, Any]] = [{"a": 1, "b": "x"}, {"c": [1, 2]}]
         rendered = batchio.to_csv(records)
         header, *rows = rendered.strip().splitlines()
         assert header == "a,b,c"

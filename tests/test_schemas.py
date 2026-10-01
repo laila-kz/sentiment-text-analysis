@@ -11,6 +11,7 @@ from schemas import (
     AnalyzeResponse,
     BatchSummaryResponse,
     HealthResponse,
+    MemoryInfo,
     TextAnalysisResponse,
 )
 from sentiment import SentimentEngine
@@ -44,7 +45,7 @@ class TestAnalyzeRequest:
 
     def test_rejects_unknown_fields(self) -> None:
         with pytest.raises(ValidationError):
-            AnalyzeRequest(text="a", nonsense=1)
+            AnalyzeRequest(text="a", nonsense=1)  # type: ignore[call-arg]
 
     def test_rejects_empty_text(self) -> None:
         with pytest.raises(ValidationError):
@@ -109,7 +110,7 @@ class TestResponses:
 
     def test_response_requires_core_fields(self) -> None:
         with pytest.raises(ValidationError):
-            AnalyzeResponse(request_id="x", model="sentiment")
+            AnalyzeResponse(request_id="x", model="sentiment")  # type: ignore[call-arg]
 
     def test_health_response_validates(self) -> None:
         payload = HealthResponse(
@@ -120,7 +121,7 @@ class TestResponses:
             cuda_available=False,
             models_loaded=0,
             models_available=3,
-            memory={"rss_mb": 10.0},
+            memory=MemoryInfo(rss_mb=10.0),
             checks={"registry_populated": True},
         )
         assert payload.memory.total_mb is None
@@ -129,12 +130,12 @@ class TestResponses:
     def test_health_status_is_constrained(self) -> None:
         with pytest.raises(ValidationError):
             HealthResponse(
-                status="exploded",
+                status="exploded",  # type: ignore[arg-type]
                 version="1",
                 uptime_seconds=0.0,
                 device="cpu",
                 cuda_available=False,
                 models_loaded=0,
                 models_available=1,
-                memory={"rss_mb": 1.0},
+                memory=MemoryInfo(rss_mb=1.0),
             )

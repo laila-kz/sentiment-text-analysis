@@ -112,6 +112,7 @@ class TestSingleAnalysis:
         uncertainty = result.uncertainty
         assert uncertainty is not None
         assert 0.0 <= uncertainty.normalized_entropy <= 1.0
+        assert result.confidence is not None
         assert uncertainty.margin == pytest.approx(
             result.confidence - result.distribution["negative"], abs=1e-5
         )
@@ -161,7 +162,11 @@ class TestCalibration:
     def test_high_temperature_flattens_confidence(self, engine: SentimentEngine) -> None:
         sharp = engine.analyse("i love this", temperature=0.5)
         soft = engine.analyse("i love this", temperature=5.0)
+        assert sharp.confidence is not None
+        assert soft.confidence is not None
         assert sharp.confidence > soft.confidence
+        assert soft.uncertainty is not None
+        assert sharp.uncertainty is not None
         assert soft.uncertainty.normalized_entropy > sharp.uncertainty.normalized_entropy
         assert soft.temperature == 5.0
 
@@ -171,6 +176,7 @@ class TestCalibration:
 
     def test_probabilities_match_temperature_scaled_softmax(self, engine: SentimentEngine) -> None:
         result = engine.analyse("good", temperature=2.0, include_logits=True)
+        assert result.logits is not None
         expected = softmax(list(result.logits), temperature=2.0)
         assert sorted(result.distribution.values(), reverse=True)[0] == pytest.approx(
             max(expected), abs=1e-5
@@ -475,6 +481,7 @@ def loader_calls(engine: SentimentEngine) -> list[list[str]]:
 
 def test_logit_probabilities_match_distribution(engine: SentimentEngine) -> None:
     result = engine.analyse("i love this", include_logits=True)
+    assert result.logits is not None
     probabilities = softmax(list(result.logits))
     for label, probability in zip(get_model_spec("sentiment").labels, probabilities, strict=True):
         assert result.distribution[label] == pytest.approx(probability, abs=1e-5)
@@ -482,5 +489,6 @@ def test_logit_probabilities_match_distribution(engine: SentimentEngine) -> None
 
 def test_entropy_of_uniform_distribution_is_one_bit(engine: SentimentEngine) -> None:
     result = engine.analyse("something the fake model has never seen")
+    assert result.uncertainty is not None
     assert math.isclose(result.uncertainty.entropy_bits, 1.0, abs_tol=1e-3)
     assert result.uncertainty.normalized_entropy == pytest.approx(1.0, abs=1e-3)

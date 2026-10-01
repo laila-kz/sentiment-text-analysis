@@ -116,7 +116,8 @@ class TestProbabilityMath:
         assert margin_of_confidence([0.5]) == pytest.approx(0.5)
         assert margin_of_confidence([]) == 0.0
         ranked = top_k([0.1, 0.7, 0.2], k=2)
-        assert ranked == [(1, pytest.approx(0.7)), (2, pytest.approx(0.2))]
+        assert [index for index, _ in ranked] == [1, 2]
+        assert [score for _, score in ranked] == pytest.approx([0.7, 0.2])
         assert top_k([0.1, 0.7], k=0) == []
 
 
