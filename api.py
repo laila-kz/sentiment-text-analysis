@@ -18,8 +18,9 @@ from __future__ import annotations
 import logging
 import os
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -317,6 +318,43 @@ def _register_routes(application: FastAPI) -> None:  # noqa: C901 - flat route t
 # ---------------------------------------------------------------------------
 
 
+def _proc_memory_bytes() -> tuple[int, int, int] | None:
+    """Return ``(rss_bytes, total_bytes, available_bytes)`` from ``/proc``.
+
+    ``psutil`` is an optional dependency, so the Linux-only ``/proc`` interface
+    is used as a fallback to keep ``/health`` meaningful in slim images. Returns
+    ``None`` when the files are unreadable (for example on Windows).
+    """
+    sysconf = getattr(os, "sysconf", None)  # POSIX only
+    if sysconf is None:
+        return None
+    try:
+        page_size = sysconf("SC_PAGE_SIZE")
+        with Path("/proc/self/statm").open(encoding="ascii") as handle:
+            resident_pages = int(handle.read().split()[1])
+        fields = dict(_parse_meminfo())
+    except (OSError, IndexError, ValueError, AttributeError):
+        return None
+
+    total_kb = fields.get("MemTotal", 0)
+    # MemAvailable is the kernel's own estimate of allocatable memory and is
+    # present on every supported Linux release; MemFree alone is misleading.
+    available_kb = fields.get("MemAvailable", fields.get("MemFree", 0))
+    if total_kb <= 0:
+        return None
+    return resident_pages * page_size, total_kb * 1024, available_kb * 1024
+
+
+def _parse_meminfo() -> Iterator[tuple[str, int]]:
+    """Yield ``(key, value_in_kb)`` pairs from ``/proc/meminfo``."""
+    with Path("/proc/meminfo").open(encoding="ascii") as handle:
+        for line in handle:
+            key, _, rest = line.partition(":")
+            parts = rest.split()
+            if parts:
+                yield key, int(parts[0])
+
+
 def _memory_info() -> MemoryInfo:
     """Best-effort memory snapshot (``psutil`` is optional)."""
     try:
@@ -330,9 +368,23 @@ def _memory_info() -> MemoryInfo:
             total_mb=round(virtual.total / (1024 * 1024), 2),
             percent_used=round(float(virtual.percent), 2),
         )
-    except Exception:  # pragma: no cover - psutil optional / restricted envs
-        logger.debug("psutil unavailable; omitting memory metrics", exc_info=True)
+    except Exception:
+        logger.debug("psutil unavailable; falling back to /proc", exc_info=True)
+
+    proc = _proc_memory_bytes()
+    if proc is None:
+        logger.debug("no readable memory source; reporting zeros", exc_info=True)
         return MemoryInfo(rss_mb=0.0)
+
+    rss_bytes, total_bytes, available_bytes = proc
+    return MemoryInfo(
+        rss_mb=round(rss_bytes / (1024 * 1024), 2),
+        available_mb=round(available_bytes / (1024 * 1024), 2),
+        total_mb=round(total_bytes / (1024 * 1024), 2),
+        percent_used=(
+            round((total_bytes - available_bytes) / total_bytes * 100, 2) if total_bytes else None
+        ),
+    )
 
 
 def health_payload(engine: SentimentEngine, settings: Settings) -> HealthResponse:
@@ -342,7 +394,7 @@ def health_payload(engine: SentimentEngine, settings: Settings) -> HealthRespons
     checks = {
         "registry_populated": bool(info["models"]),
         "device_resolved": bool(info["resolved_device"]),
-        "memory_readable": True,
+        "memory_readable": memory.rss_mb > 0.0,
         "model_loaded": bool(info["loaded_models"]),
     }
     pressure = (memory.percent_used or 0.0) > 95.0

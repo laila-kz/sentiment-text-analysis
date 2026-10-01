@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import builtins
+import io
+import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -195,6 +199,66 @@ class TestHealth:
         body = client.get("/health").json()
         assert body["models_loaded"] == 1
         assert body["checks"]["model_loaded"] is True
+
+    def test_memory_falls_back_to_proc_without_psutil(
+        self, client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CI ships no psutil, so /proc has to carry the memory report."""
+        statm = "1200 300 40 4 0 900 0\n"
+        meminfo = (
+            "MemTotal:       8192000 kB\nMemFree:         100 kB\nMemAvailable:    4096000 kB\n"
+        )
+
+        def fake_open(path, mode="r", *args, **kwargs):  # noqa: ANN001, ANN202
+            name = str(path).replace("\\", "/")
+            if name == "/proc/self/statm":
+                return io.StringIO(statm)
+            if name == "/proc/meminfo":
+                return io.StringIO(meminfo)
+            raise AssertionError(f"unexpected path: {path}")
+
+        real_import = builtins.__import__
+
+        def no_psutil(name, *args, **kwargs):  # noqa: ANN001, ANN202
+            if name == "psutil":
+                raise ImportError("psutil is not installed")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", fake_open)
+        monkeypatch.setattr(builtins, "__import__", no_psutil)
+        monkeypatch.setattr(os, "sysconf", lambda name: 4096, raising=False)  # type: ignore[arg-type]
+
+        info = api._memory_info()
+        assert info.rss_mb == pytest.approx(300 * 4096 / (1024 * 1024), abs=0.01)
+        assert info.total_mb == pytest.approx(8192000 / 1024, abs=0.01)
+        assert info.available_mb == pytest.approx(4096000 / 1024, abs=0.01)
+        assert info.percent_used == pytest.approx(50.0, abs=0.01)
+
+        body = client.get("/health").json()
+        assert body["checks"]["memory_readable"] is True
+        assert body["memory"]["rss_mb"] > 0
+
+    def test_memory_reports_zero_when_no_source_is_readable(
+        self, client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def no_open(path, mode="r", *args, **kwargs):  # noqa: ANN001, ANN202
+            raise OSError(path)
+
+        real_import = builtins.__import__
+
+        def no_psutil(name, *args, **kwargs):  # noqa: ANN001, ANN202
+            if name == "psutil":
+                raise ImportError("psutil is not installed")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", no_open)
+        monkeypatch.setattr(builtins, "__import__", no_psutil)
+        monkeypatch.setattr(os, "sysconf", lambda name: 4096, raising=False)  # type: ignore[arg-type]
+
+        assert api._memory_info().rss_mb == 0.0
+        body = client.get("/health").json()
+        assert body["checks"]["memory_readable"] is False
+        assert body["status"] == "ok"
 
 
 class TestMiddleware:
