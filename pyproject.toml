@@ -80,6 +80,10 @@ ignore_errors = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
+# The shipped modules live at the repository root, so put it on sys.path
+# explicitly: bare `pytest` (as used in CI) does not add the working
+# directory the way `python -m pytest` does.
+pythonpath = ["."]
 addopts = "-ra --strict-markers --strict-config"
 filterwarnings = [
     "ignore:Using `httpx` with `starlette.testclient` is deprecated.*",
